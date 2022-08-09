@@ -51,7 +51,7 @@ function App() {
       throw new Error("Missing Infura Id");
     }
     const web3Provider = await web3Modal.connect();
-    
+
     web3Provider.on("accountsChanged", accountsChanged);
     web3Provider.on("chainChanged", chainChanged);
     web3Provider.on("disconnect", reset);
