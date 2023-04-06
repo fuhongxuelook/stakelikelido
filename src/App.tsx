@@ -1,13 +1,12 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Web3Modal from "web3modal";
 import WalletConnectProvider from "@walletconnect/ethereum-provider";
 import { Contract, providers, utils } from "ethers";
 
 // @ts-ignore
-import logo from "./logo.svg";
 import "./App.css";
 import { formatAuthMessage } from "./utils";
-import { DAI } from "./constants";
+import { NowContract } from "./constants";
 
 let REACT_APP_INFURA_ID = "87S6H45F20KHG753VB5Q";
 
@@ -26,6 +25,10 @@ function App() {
   });
 
   const [chainId, setChainId] = React.useState<number>(1);
+  const [waiting, setWaiting] = React.useState<boolean>(false);
+  const [hash, setHash] = React.useState<string>('');
+  const [error, setError] = React.useState<string>('');
+  const [value, setValue] = React.useState<number>();
   const [address, setAddress] = React.useState<string>("");
   const [provider, setProvider] = React.useState<providers.Web3Provider>();
 
@@ -45,6 +48,11 @@ function App() {
     setProvider(undefined);
     web3Modal.clearCachedProvider();
   }
+
+  useEffect(() => {
+    setHash('')
+    setError('')
+  }, [address, chainId, provider, value]);
 
   async function connect() {
     if (!REACT_APP_INFURA_ID) {
@@ -74,30 +82,95 @@ function App() {
     console.log("isValid", utils.verifyMessage(msg, sig) === utils.getAddress(address));
   }
 
-  async function transferDai() {
-    if (!provider) {
-      throw new Error("Provider not connected");
+  function checkChainSupported() {
+    const chains = [5]
+    if (chains.indexOf(Number(chainId)) === -1) {
+      setError(`Only supported on chain: ${chains.join(', ')}`)
+
+      return false;
     }
-    const contract = new Contract(DAI.address, DAI.abi, provider.getSigner());
-    const res = await contract.transfer(address, utils.parseEther("1"));
-    console.log("res", res);
+    return true
+  }
+
+  async function deposit() {
+    if (!provider) {
+      return setError('Provider not connected')
+    }
+
+    if (!checkChainSupported()) return
+
+    if (!value) {
+      return setError('Please enter Amount')
+    }
+    if (waiting) {
+      return setError('Please finish the previous transaction')
+    }
+
+    setHash('')
+    setError('')
+    setWaiting(true)
+    try {
+      const contract = new Contract(NowContract.address, NowContract.abi, provider.getSigner());
+      const res = await contract.deposit({
+        value: utils.parseEther(value.toString()),
+      });
+      setHash(res.hash);
+      setWaiting(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'something went wrong')
+      setWaiting(false)
+    }
   }
 
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <div>{provider ? "Connected!" : "Not connected"}</div>
+      <div className="content">
         {address ? (
           <>
-            <div>{address}</div>
-            <button onClick={signMessage}>Authenticate</button>
-            <button onClick={transferDai}>Transfer DAI</button>
+            <div>Connected: {address}</div>
+            <div>ChainID: {chainId}</div>
+            <div>
+              Amount:
+              <input
+                type="number"
+                min={0}
+                max={999999999}
+                step={0.01}
+                value={value} onChange={e => {setValue(e.target.valueAsNumber)}}
+              />
+            </div>
+            {hash ? (
+              <div className="hash-wrap">
+                <div>
+                  success hash: {hash}
+                </div>
+                <div className="close"
+                  onClick={e => setHash('')}
+                >x</div>
+              </div>
+            ) : null}
+            {error ? (
+              <div className="error-wrap">
+                <div>
+                  error: {error}
+                </div>
+                <div className="close"
+                  onClick={e => setError('')}
+                >x</div>
+              </div>
+            ) : null}
+            {/* <button onClick={signMessage}>Authenticate</button> */}
+            <button disabled={!value} onClick={deposit}>
+              {waiting ? 'waiting' : 'deposit'}
+            </button>
           </>
         ) : (
-          <button onClick={connect}>Connect</button>
+          <>
+            <div>Not connected</div>
+            <button onClick={connect}>Connect</button>
+          </>
         )}
-      </header>
+      </div>
     </div>
   );
 }
