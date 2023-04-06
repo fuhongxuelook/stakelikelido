@@ -24,3 +24,6 @@ yarn build
 
 MIT
 # stakelikelido
+
+## task
+1. 修改页面: 仿照saviswap的样式，钱包放在右上角，增加背景，优化输入框和按钮
